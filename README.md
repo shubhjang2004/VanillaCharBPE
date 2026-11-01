@@ -51,7 +51,19 @@ assert enc.decode(ids) == "भारत सरकार नई दिल्ल�
 Training script (same lines as the other two tokenizers):
 `python scripts/train_corpus.py --base /content/drive/MyDrive`.
 
-Decoding is lossless: `decode(encode(text)) == text` for any string.
+### Normalization
+
+Training and encoding first apply `normalize()` (stored in each saved
+tokenizer as `"normalization": "nfkc_indic_v1"`; identical in all three repos):
+NFKC (so `क़` and `क` + `़` are the same), removal of invisible format
+characters (ZWNJ, ZWJ, ZWSP, LRM/RLM, BOM, soft hyphen), and rewriting of
+script-only signs into ordinary letters: Malayalam chillus → consonant +
+virama, Bengali `ৎ` → `ত্`, Gurmukhi tippi `ੰ` → bindi `ਂ`, addak `ੱ` + C →
+C + virama + C, Malayalam `ൗ` → `ൌ`. Whitespace and newlines are kept.
+
+`decode(encode(text)) == normalize(text)` for any string. Train with
+`normalization=None` for an exactly lossless tokenizer (`decode(encode(text)) == text`).
+Tokenizer files from 0.1.x have no normalization and load unchanged.
 
 ## Install
 

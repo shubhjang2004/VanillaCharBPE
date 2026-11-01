@@ -8,6 +8,7 @@ from typing import Dict, Iterable, Iterator, Optional, Sequence, Union
 
 from . import _core
 from .core import N_FIXED_TOKENS, VARIANT, Encoding
+from .normalize import DEFAULT_NORMALIZATION, normalize
 
 DEFAULT_SPECIAL_TOKENS = ("<|endoftext|>", "<|pad|>")
 
@@ -25,7 +26,7 @@ def _batched(it: Iterable[str], n: int) -> Iterator[list]:
         yield batch
 
 
-def _count(files, texts, lines_per_file, batch_size, pat_str, log):
+def _count(files, texts, lines_per_file, batch_size, pat_str, normalization, log):
     trainer = _core.Trainer(pat_str)
     sources = []
     if isinstance(files, dict):
@@ -41,7 +42,7 @@ def _count(files, texts, lines_per_file, batch_size, pat_str, log):
     for label, lines in sources:
         n = 0
         for batch in _batched(lines, batch_size):
-            trainer.feed(batch)
+            trainer.feed([normalize(t, normalization) for t in batch])
             n += len(batch)
         log(f"[{VARIANT}] {label}: {n:,} lines | unique pieces so far {trainer.n_unique_pieces():,}")
     log(f"[{VARIANT}] counting done in {time.time() - t0:.1f}s")
@@ -49,7 +50,7 @@ def _count(files, texts, lines_per_file, batch_size, pat_str, log):
 
 
 def _finish(trainer, sources, vocab_size, special_tokens, min_frequency, min_unit_frequency,
-            lines_per_file, pat_str, name, log) -> Encoding:
+            lines_per_file, pat_str, normalization, name, log) -> Encoding:
     n_ordinary = vocab_size - len(special_tokens)
     if n_ordinary <= N_FIXED_TOKENS:
         raise ValueError(f"vocab_size must exceed {N_FIXED_TOKENS + len(special_tokens)}")
@@ -82,6 +83,7 @@ def _finish(trainer, sources, vocab_size, special_tokens, min_frequency, min_uni
             "lines_per_file": lines_per_file,
             "sources": sources,
         },
+        normalization=normalization,
     )
 
 
@@ -104,6 +106,7 @@ def train(
     min_unit_frequency: int = 10,
     batch_size: int = 20_000,
     pat_str: str = _core.DEFAULT_PATTERN,
+    normalization: Optional[str] = DEFAULT_NORMALIZATION,
     name: str = VARIANT,
     verbose: bool = True,
 ) -> Encoding:
@@ -116,14 +119,16 @@ def train(
         vocab_size: total vocabulary size including special tokens.
         lines_per_file: read at most this many lines from each file.
         min_frequency: stop merging when the best pair is rarer than this.
-        min_unit_frequency: script-specific signs (chillu, danda, ...) rarer
+        min_unit_frequency: script-specific signs (danda, avagraha, ...) rarer
             than this get no token of their own and fall back to bytes.
+        normalization: applied to the corpus here and to every text the
+            encoding encodes later (see `normalize.py`); None keeps text as is.
     """
     return train_many(
         files, texts=texts, vocab_sizes=[vocab_size], lines_per_file=lines_per_file,
         special_tokens=special_tokens, min_frequency=min_frequency,
         min_unit_frequency=min_unit_frequency, batch_size=batch_size, pat_str=pat_str,
-        name_format=name, verbose=verbose,
+        normalization=normalization, name_format=name, verbose=verbose,
     )[vocab_size]
 
 
@@ -138,17 +143,18 @@ def train_many(
     min_unit_frequency: int = 10,
     batch_size: int = 20_000,
     pat_str: str = _core.DEFAULT_PATTERN,
+    normalization: Optional[str] = DEFAULT_NORMALIZATION,
     name_format: str = VARIANT + "_{k}k",
     verbose: bool = True,
 ) -> Dict[int, Encoding]:
     """Like `train`, but reads the corpus once and learns one encoding per
     vocab size. `name_format` may use {k} (size in thousands) and {size}."""
     log = _logger(verbose)
-    trainer, sources = _count(files, texts, lines_per_file, batch_size, pat_str, log)
+    trainer, sources = _count(files, texts, lines_per_file, batch_size, pat_str, normalization, log)
     return {
         size: _finish(
             trainer, sources, size, special_tokens, min_frequency, min_unit_frequency,
-            lines_per_file, pat_str, name_format.format(k=size // 1000, size=size), log,
+            lines_per_file, pat_str, normalization, name_format.format(k=size // 1000, size=size), log,
         )
         for size in vocab_sizes
     }

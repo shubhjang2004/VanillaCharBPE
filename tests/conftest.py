@@ -16,3 +16,9 @@ CORPUS = [
 @pytest.fixture(scope="session")
 def enc() -> tok.Encoding:
     return tok.train(texts=CORPUS * 30, vocab_size=1200, min_unit_frequency=1, verbose=False)
+
+
+@pytest.fixture(scope="session")
+def raw_enc() -> tok.Encoding:
+    """Same corpus, no normalization: encoding is exactly lossless."""
+    return tok.train(texts=CORPUS * 30, vocab_size=1200, min_unit_frequency=1, normalization=None, verbose=False)

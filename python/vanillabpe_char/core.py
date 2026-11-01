@@ -7,6 +7,7 @@ import unicodedata
 from typing import AbstractSet, Collection, Dict, List, Literal, Optional, Sequence, Tuple, Union
 
 from . import _core
+from .normalize import NORMALIZATIONS, normalize
 
 SCRIPT_NAMES: Tuple[str, ...] = tuple(_core.SCRIPT_NAMES)
 SHARED_BASE: int = _core.SHARED_BASE
@@ -51,8 +52,12 @@ class Encoding:
         merges: Sequence[Tuple[int, int]],
         special_tokens: Dict[str, int],
         metadata: Optional[dict] = None,
+        normalization: Optional[str] = None,
     ):
+        if normalization is not None and normalization not in NORMALIZATIONS:
+            raise ValueError(f"unknown normalization {normalization!r}; known: {NORMALIZATIONS}")
         self.name = name
+        self.normalization = normalization
         self._pat_str = pat_str
         self._specific_units = [int(u) for u in specific_units]
         self._merges = [(int(a), int(b)) for a, b in merges]
@@ -67,9 +72,13 @@ class Encoding:
 
     # ------------------------------------------------------------------ encode
 
+    def normalize(self, text: str) -> str:
+        """The text this encoding actually encodes (see `normalize.py`)."""
+        return normalize(text, self.normalization)
+
     def encode_ordinary(self, text: str) -> List[int]:
         """Encodes text, ignoring special tokens."""
-        return self._core_bpe.encode_ordinary(text)
+        return self._core_bpe.encode_ordinary(self.normalize(text))
 
     def encode(
         self,
@@ -81,12 +90,13 @@ class Encoding:
         """Encodes text. Same special-token semantics as tiktoken: a special
         token string in the text raises unless it is allowed or explicitly not
         disallowed."""
+        text = self.normalize(text)
         allowed = self._resolve_allowed(allowed_special)
         self._check_disallowed(text, allowed, disallowed_special)
         return self._core_bpe.encode(text, allowed)
 
     def encode_ordinary_batch(self, text: Sequence[str]) -> List[List[int]]:
-        return self._core_bpe.encode_ordinary_batch(list(text))
+        return self._core_bpe.encode_ordinary_batch([self.normalize(t) for t in text])
 
     def encode_batch(
         self,
@@ -95,10 +105,11 @@ class Encoding:
         allowed_special: Union[Literal["all"], AbstractSet[str]] = set(),
         disallowed_special: Union[Literal["all"], Collection[str]] = "all",
     ) -> List[List[int]]:
+        text = [self.normalize(t) for t in text]
         allowed = self._resolve_allowed(allowed_special)
         for t in text:
             self._check_disallowed(t, allowed, disallowed_special)
-        return self._core_bpe.encode_batch(list(text), allowed)
+        return self._core_bpe.encode_batch(text, allowed)
 
     def _resolve_allowed(self, allowed_special) -> set:
         if allowed_special == "all":
@@ -128,7 +139,7 @@ class Encoding:
         return self._core_bpe.decode_bytes(list(tokens))
 
     def decode(self, tokens: Sequence[int], errors: str = "replace") -> str:
-        """Decodes tokens to text. For any text, decode(encode(text)) == text."""
+        """Decodes tokens to text. For any text, decode(encode(text)) == normalize(text)."""
         return self._core_bpe.decode_bytes(list(tokens)).decode("utf-8", errors=errors)
 
     def decode_batch(self, batch: Sequence[Sequence[int]], errors: str = "replace") -> List[str]:
@@ -205,6 +216,7 @@ class Encoding:
             "merges": self._merges,
             "special_tokens": self._special_tokens,
             "metadata": self.metadata,
+            "normalization": self.normalization,
         }
 
     @classmethod
@@ -220,6 +232,7 @@ class Encoding:
             merges=[tuple(m) for m in d["merges"]],
             special_tokens=d["special_tokens"],
             metadata=d.get("metadata"),
+            normalization=d.get("normalization"),
         )
 
     def save(self, path: Union[str, os.PathLike]) -> None:
@@ -242,4 +255,5 @@ class Encoding:
             merges=[tuple(m) for m in state["merges"]],
             special_tokens=state["special_tokens"],
             metadata=state.get("metadata"),
+            normalization=state.get("normalization"),
         )

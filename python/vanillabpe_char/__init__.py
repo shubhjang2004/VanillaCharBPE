@@ -4,8 +4,9 @@
 """
 
 from .core import SCRIPT_NAMES, VARIANT, Encoding
+from .normalize import DEFAULT_NORMALIZATION, normalize
 from .registry import get_encoding, list_encoding_names
 from .training import train, train_many
 
-__all__ = ["Encoding", "SCRIPT_NAMES", "VARIANT", "get_encoding", "list_encoding_names", "train", "train_many"]
-__version__ = "0.1.0"
+__all__ = ["DEFAULT_NORMALIZATION", "Encoding", "SCRIPT_NAMES", "VARIANT", "get_encoding", "list_encoding_names", "normalize", "train", "train_many"]
+__version__ = "0.2.0"

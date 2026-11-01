@@ -1,0 +1,25 @@
+[package]
+name = "vanillabpe_char"
+version = "0.1.0"
+edition = "2021"
+description = "Character-level vanilla BPE baseline for Indic scripts (AksharaG2P without cross-script phoneme sharing)"
+license = "MIT"
+
+[lib]
+name = "_core"
+crate-type = ["cdylib", "rlib"]
+
+[features]
+default = []
+# maturin enables this (plus pyo3/extension-module) when building the wheel
+python = ["pyo3"]
+
+[dependencies]
+pyo3 = { version = "0.22.6", default-features = false, features = ["macros", "abi3-py38"], optional = true }
+fancy-regex = "0.13.0"
+rustc-hash = "2.0.0"
+rayon = "1.10.0"
+
+[profile.release]
+lto = true
+codegen-units = 1

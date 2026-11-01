@@ -1,0 +1,26 @@
+[build-system]
+requires = ["maturin>=1.5,<2.0"]
+build-backend = "maturin"
+
+[project]
+name = "vanillabpe-char"
+version = "0.1.0"
+description = "Character-level vanilla BPE baseline for Indic scripts (AksharaG2P without cross-script phoneme sharing)"
+readme = "README.md"
+license = { text = "MIT" }
+authors = [{ name = "Shubham Jangid" }]
+requires-python = ">=3.8"
+dependencies = []
+classifiers = [
+    "Programming Language :: Rust",
+    "Programming Language :: Python :: 3",
+    "Topic :: Text Processing :: Linguistic",
+]
+
+[project.optional-dependencies]
+test = ["pytest"]
+
+[tool.maturin]
+python-source = "python"
+module-name = "vanillabpe_char._core"
+features = ["python", "pyo3/extension-module"]
